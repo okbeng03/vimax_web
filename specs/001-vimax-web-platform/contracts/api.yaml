@@ -1,0 +1,415 @@
+# API Contracts: ViMax Web 平台
+
+**Feature**: 001-vimax-web-platform | **Date**: 2026-06-17
+
+**Base URL**: `http://localhost:8000/api`
+
+**Content-Type**: `application/json`
+
+---
+
+## 1. Templates (模板)
+
+### `GET /api/templates`
+获取所有可用模板列表。
+
+**Response** `200`:
+```json
+{
+  "templates": [
+    {
+      "id": 1,
+      "name": "standard",
+      "display_name": "标准视频",
+      "description": "平衡质量和速度的默认模板"
+    }
+  ]
+}
+```
+
+---
+
+## 2. Projects (项目管理)
+
+### `GET /api/projects`
+获取项目列表，支持筛选和搜索。
+
+**Query Params**: `?status=running&search=测试&page=1&page_size=20`
+
+**Response** `200`:
+```json
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "测试视频",
+      "creative_description": "...",
+      "working_dir": "/path/to/project_1",
+      "status": "idle",
+      "template_name": "标准视频",
+      "current_step_name": null,
+      "step_summary": {"total": 14, "completed": 5, "failed": 0},
+      "created_at": "2026-06-17T10:00:00",
+      "updated_at": "2026-06-17T10:30:00"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+### `POST /api/projects`
+创建新项目。
+
+**Request**:
+```json
+{
+  "name": "测试视频",
+  "creative_description": "一只小猫在花园玩耍",
+  "template_id": 1,
+  "working_dir_root": "/Users/wangchangbin/ai/vimax_ru"
+}
+```
+
+**Response** `201`:
+```json
+{
+  "id": 1,
+  "name": "测试视频",
+  "working_dir": "/Users/wangchangbin/ai/vimax_ru/project_1",
+  "status": "idle",
+  "created_at": "2026-06-17T10:00:00"
+}
+```
+
+### `GET /api/projects/{id}`
+获取项目详情。
+
+**Response** `200`:
+```json
+{
+  "id": 1,
+  "name": "测试视频",
+  "creative_description": "...",
+  "working_dir": "/path/to/project_1",
+  "status": "running",
+  "template_id": 1,
+  "current_step_name": "story",
+  "config": {
+    "yaml_content": "... (idea2video.yaml 原始内容) ...",
+    "config_py_content": "... (config.py 原始内容) ..."
+  },
+  "steps": [...],
+  "unconfirmed_count": 3,
+  "created_at": "...",
+  "updated_at": "..."
+}
+```
+
+### `PUT /api/projects/{id}/config`
+更新项目配置（双向同步到 working_dir）。
+
+**Request**:
+```json
+{
+  "yaml_content": "... (完整的 idea2video.yaml 内容) ...",
+  "config_py_content": "... (完整的 config.py 内容) ..."
+}
+```
+
+**Response** `200`: `{"status": "synced"}`
+
+### `DELETE /api/projects/{id}`
+删除项目及 working_dir。**Response** `204`
+
+---
+
+## 3. Steps (分步执行)
+
+### `GET /api/projects/{id}/steps`
+获取项目的所有步骤及状态。
+
+**Response** `200`:
+```json
+{
+  "steps": [
+    {
+      "id": 1,
+      "name": "story",
+      "step_order": 0,
+      "status": "fully_complete",
+      "started_at": "...",
+      "completed_at": "...",
+      "duration_seconds": 12.5,
+      "output_files": ["story.txt"],
+      "retry_count": 0,
+      "comfyui_results": [
+        {
+          "id": 1,
+          "file_path": "scene_0/first_frame_00001.png",
+          "thumbnail_path": "...",
+          "prompt_id": "abc123",
+          "generation_type": "first_frame",
+          "duration_seconds": 45.2,
+          "confirmed": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+### `POST /api/projects/{id}/steps/execute`
+启动/继续项目流水线执行。
+
+**Request**:
+```json
+{
+  "action": "start"
+}
+```
+> `action` 可选值: `"start"` (从头开始), `"continue"` (从当前断点继续), `"retry_step"` (重试某步骤需附带 step_name)
+
+**Response** `202`:
+```json
+{
+  "project_id": 1,
+  "status": "running",
+  "current_step_name": "story",
+  "message": "ViMax process started"
+}
+```
+
+### `POST /api/projects/{id}/steps/kill`
+强制终止当前运行的 ViMax 进程。
+
+**Response** `200`:
+```json
+{
+  "status": "killed",
+  "message": "ViMax process terminated"
+}
+```
+
+---
+
+## 4. Files (文件管理)
+
+### `GET /api/projects/{id}/files`
+获取项目文件树。
+
+**Query Params**: `?path=scene_0` (可选，默认根目录)
+
+**Response** `200`:
+```json
+{
+  "current_path": "",
+  "files": [
+    {"name": "story.txt", "type": "file", "size": 1024, "modified_at": "..."},
+    {"name": "script.json", "type": "file", "size": 2048, "modified_at": "..."},
+    {"name": "scene_0", "type": "directory", "children_count": 5}
+  ]
+}
+```
+
+### `GET /api/projects/{id}/files/content`
+读取文件内容。
+
+**Query Params**: `?path=story.txt`
+
+**Response** `200`:
+```json
+{
+  "path": "story.txt",
+  "content": "Once upon a time...",
+  "size": 1024,
+  "modified_at": "..."
+}
+```
+
+### `PUT /api/projects/{id}/files/content`
+保存/编辑文件内容。
+
+**Request**:
+```json
+{
+  "path": "story.txt",
+  "content": "Updated content..."
+}
+```
+
+**Response** `200`: `{"path": "story.txt", "status": "saved"}`
+
+> 此操作自动创建 OperationLog 记录。
+
+---
+
+## 5. Generations (ComfyUI 结果)
+
+### `GET /api/projects/{id}/generations`
+获取项目的所有 ComfyUI 生成结果。
+
+**Query Params**: `?confirmed=false&step_name=storyboard&page=1`
+
+**Response** `200`:
+```json
+{
+  "generations": [
+    {
+      "id": 1,
+      "step_name": "storyboard",
+      "file_path": "scene_0/first_frame_00001.png",
+      "prompt_id": "abc123",
+      "generation_type": "first_frame",
+      "duration_seconds": 45.2,
+      "confirmed": false,
+      "created_at": "..."
+    }
+  ],
+  "total": 5,
+  "unconfirmed_count": 3
+}
+```
+
+### `POST /api/projects/{id}/generations/{generation_id}/confirm`
+确认生成结果。**Response** `200`
+
+### `POST /api/projects/{id}/generations/{generation_id}/retry`
+编辑 workflow 参数后重新生成（抽卡）。后端从 `working_dir/workflows` 读取当前 workflow 定义（ui 版和 api 版），合并用户修改的参数后提交 ComfyUI。
+
+**Request**:
+```json
+{
+  "modified_params": {"seed": 42, "steps": 30}
+}
+```
+
+**Response** `202`: `{"new_generation_id": 6, "prompt_id": "xyz789"}`
+
+---
+
+## 6. Operations (操作记录)
+
+### `GET /api/projects/{id}/operations`
+获取项目操作记录。
+
+**Query Params**: `?type=edit_file&page=1&page_size=50`
+
+**Response** `200`:
+```json
+{
+  "operations": [
+    {
+      "id": 1,
+      "operation_type": "edit_file",
+      "target_type": "file",
+      "target_name": "story.txt",
+      "summary": "修改了第3段描述",
+      "user_name": "Muze",
+      "created_at": "2026-06-17T10:15:00"
+    }
+  ],
+  "total": 42
+}
+```
+
+---
+
+## 7. Statistics (统计分析)
+
+### `GET /api/statistics/overview`
+全局统计概览。
+
+**Response** `200`:
+```json
+{
+  "total_projects": 10,
+  "completed_projects": 7,
+  "failed_projects": 2,
+  "running_projects": 1,
+  "success_rate": 0.78,
+  "total_generations": 150,
+  "avg_generation_duration": 45.3,
+  "failure_reasons": {
+    "timeout": 5,
+    "api_error": 3,
+    "validation_failed": 2,
+    "connection_failed": 1
+  },
+  "trend": {
+    "daily": [
+      {"date": "2026-06-15", "total": 5, "success": 4, "failed": 1},
+      {"date": "2026-06-16", "total": 8, "success": 6, "failed": 2}
+    ],
+    "weekly": [...]
+  }
+}
+```
+
+### `GET /api/projects/{id}/statistics`
+单个项目的统计。
+
+**Response** `200`:
+```json
+{
+  "scene_count": 5,
+  "file_counts": {"txt": 2, "json": 3, "png": 25, "mp4": 5},
+  "total_file_size_mb": 450.2,
+  "total_duration_seconds": 1800.5,
+  "steps": [
+    {"name": "story", "duration": 12.5, "status": "fully_complete"},
+    {"name": "storyboard", "duration": 120.0, "status": "fully_complete"}
+  ],
+  "generation_stats": {
+    "total": 25,
+    "success": 22,
+    "failed": 3,
+    "success_rate": 0.88
+  }
+}
+```
+
+---
+
+## 8. WebSocket
+
+### `WS /ws/projects/{project_id}/stdout`
+实时推送 ViMax stdout 输出。
+
+**Client → Server**: 无消息体，连接建立后开始推送。
+
+**Server → Client**:
+```json
+{
+  "type": "stdout",
+  "content": "[12:30:45] INFO: Generating story...\n",
+  "timestamp": "2026-06-17T12:30:45"
+}
+```
+```json
+{
+  "type": "status",
+  "step_name": "story",
+  "step_status": "completed",
+  "timestamp": "2026-06-17T12:31:30"
+}
+```
+
+---
+
+## Error Responses
+
+所有错误返回统一格式：
+
+```json
+{
+  "error": {
+    "code": "PROJECT_NOT_FOUND",
+    "message": "项目不存在",
+    "detail": "Project with id 999 does not exist"
+  }
+}
+```
+
+**HTTP Status Codes**: 400 (Bad Request), 404 (Not Found), 409 (Conflict - 已有项目运行中), 422 (Validation Error), 500 (Internal Error)
