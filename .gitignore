@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data
+data/vimax_web.db
+data/projects/
+backend/data/
+*.tmp

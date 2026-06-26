@@ -1,0 +1,70 @@
+chat_model:
+  init_args:
+    model: qwen3.7-plus-2026-05-26
+    model_provider: qwen
+  max_requests_per_minute: 500
+  max_requests_per_day: 2000
+
+image_generator:
+  class_path: tools.ImageGeneratorComfyUIFlux
+  init_args:
+    base_url: http://192.168.3.4:8188
+  max_requests_per_minute: null
+  max_requests_per_day: null
+
+video_generator:
+  class_path: tools.VideoGeneratorComfyUILTX
+  init_args:
+    base_url: http://192.168.3.4:8188
+  max_requests_per_minute: null
+  max_requests_per_day: null
+
+audio_generator:
+  class_path: tools.AudioGeneratorComfyUIQwenTTS
+  init_args:
+    base_url: http://192.168.3.4:8188
+  max_requests_per_minute: null
+  max_requests_per_day: null
+
+working_dir: /Users/wangchangbin/ai/vimax_ru
+
+# 中断步骤
+## 汉字步骤
+# crawl 爬取数据
+# download 下载并转换字形图片
+# idea 生成创意
+# transition 生成过渡描述
+# video 生成演变动画
+# hanzi
+## 正常流程步骤
+# story 生成故事
+# character 提取角色特征
+# portrait 生成角色肖像
+# script 生成剧本
+# environment 生成环境描述
+# environment_images 生成环境图片
+# storyboard 生成故事板
+# shot_description 生成镜头描述
+# camera_tree 生成相机树
+# camera_frame 生成相机帧
+# shot_video
+# shot_transition
+# scene_video
+# scene_transition
+interrupt_step: null
+
+# 模式
+mode: hanzi
+
+gacha_config:
+  # 抽卡类型
+  type: last_frame
+  scene: 1
+  shot: 2
+
+hanzi: 入
+# relate_hanzi: 春,明,时,早,明,昨,暑
+# relate_hanzi: 龟,日,月,山,水
+
+# new_character: 仓颉
+comfyui_base_url: http://192.168.3.4:8188
