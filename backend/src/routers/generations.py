@@ -31,9 +31,6 @@ from src.services.vimax_runner import vimax_runner
 
 router = APIRouter(prefix="/api/projects", tags=["generations"])
 
-# Step names eligible for gacha re-roll (scene/shot level)
-GACHA_STEP_NAMES = {"scene_video", "shot_video", "scene_transition", "shot_transition"}
-
 # Regex to extract scene/shot from file_path
 _SCENE_SHOT_RE = re.compile(r"scene[_\s]*(\d+).*?shots?[_\s/]*(\d+)", re.IGNORECASE)
 _SCENE_ONLY_RE = re.compile(r"scene[_\s]*(\d+)", re.IGNORECASE)
