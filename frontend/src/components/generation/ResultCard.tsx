@@ -28,21 +28,23 @@ function isVideo(path: string): boolean { return VIDEO_EXTS.includes(fileExt(pat
 function isImage(path: string): boolean { return IMAGE_EXTS.includes(fileExt(path)); }
 function isAudio(path: string): boolean { return AUDIO_EXTS.includes(fileExt(path)); }
 
-/** Scene / shot steps qualify for gacha re-roll */
-const GACHA_STEPS = new Set(["scene_video", "shot_video", "scene_transition", "shot_transition"]);
+/** Prompt file mapping per step_name (takes priority over generation_type) */
+const STEP_PROMPT_MAP: Record<string, string> = {
+  shot_description: "shot_description.json",
+};
 
-/** Prompt file mapping per generation_type */
+/** Prompt file mapping per generation_type (fallback) */
 const PROMPT_FILE_MAP: Record<string, string> = {
   first_frame: "first_frame_selector_output.json",
   last_frame: "last_frame_selector_output.json",
   video: "ltx_prompt.json",
 };
 
-function getPromptRelPath(resultRelPath: string, genType: string): string {
+function getPromptRelPath(resultRelPath: string, promptFile: string): string {
   const dir = resultRelPath.includes("/")
     ? resultRelPath.substring(0, resultRelPath.lastIndexOf("/") + 1)
     : "";
-  return dir + (PROMPT_FILE_MAP[genType] || "");
+  return dir + promptFile;
 }
 
 interface Props {
@@ -51,7 +53,7 @@ interface Props {
   onConfirm: () => void;
   onCancel: () => void;
   onRecover: () => void;
-  onGacha: () => void;
+  onGacha: (scene: number, shot: number) => void;
   onRetry: () => void;
 }
 
@@ -60,10 +62,10 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
   const previewHeight = 180;
 
   // ── Prompt file editor ──
-  const promptFileName = PROMPT_FILE_MAP[result.generation_type] || "";
-  const isGachaEligible = (result.step_name && GACHA_STEPS.has(result.step_name)) || !!promptFileName;
+  const promptFileName = STEP_PROMPT_MAP[result.step_name || ""] || PROMPT_FILE_MAP[result.generation_type] || "";
+  const isGachaEligible = !!promptFileName;
   const canEditPrompt = !!promptFileName;
-  const promptRelPath = canEditPrompt ? getPromptRelPath(result.relative_path, result.generation_type) : "";
+  const promptRelPath = canEditPrompt ? getPromptRelPath(result.original_relative_path || result.relative_path, promptFileName) : "";
 
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
   const [promptContent, setPromptContent] = useState("");
@@ -71,6 +73,7 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
   const [promptSaving, setPromptSaving] = useState(false);
   const [promptDirty, setPromptDirty] = useState(false);
   const promptOriginalRef = { current: "" };
+  const isComposing = useRef(false);
 
   // ── Drag state for prompt modal ──
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -128,9 +131,19 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
 
   const handlePromptChange = (v: string | undefined) => {
     const val = v || "";
+    if (isComposing.current) return;
     setPromptContent(val);
     setPromptDirty(val !== promptOriginalRef.current);
   };
+
+  const handlePromptEditorMount = useCallback((editor: any) => {
+    const domNode = editor.getDomNode();
+    if (!domNode) return;
+    const textarea = domNode.querySelector("textarea");
+    if (!textarea) return;
+    textarea.addEventListener("compositionstart", () => { isComposing.current = true; });
+    textarea.addEventListener("compositionend", () => { isComposing.current = false; });
+  }, []);
 
   const handleSavePrompt = async () => {
     setPromptSaving(true);
@@ -258,6 +271,11 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
                   Prompt
                 </Button>
               )}
+              {isGachaEligible && (
+                <Button size="small" icon={<RetweetOutlined />} onClick={() => onGacha(result.scene ?? 1, result.shot ?? 2)}>
+                  抽卡
+                </Button>
+              )}
             </Space>
           ) : (
             <Space size={4} wrap>
@@ -284,11 +302,6 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
                   {canEditPrompt && (
                     <Button size="small" icon={<EditOutlined />} onClick={handleOpenPromptEditor}>
                       Prompt
-                    </Button>
-                  )}
-                  {isGachaEligible && (
-                    <Button size="small" icon={<RetweetOutlined />} onClick={onGacha}>
-                      抽卡
                     </Button>
                   )}
                 </>
@@ -366,6 +379,7 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
                 language="json"
                 value={promptContent}
                 onChange={handlePromptChange}
+                onMount={handlePromptEditorMount}
                 theme="vs-dark"
                 options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }}
               />
