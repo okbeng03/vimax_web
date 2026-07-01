@@ -88,7 +88,9 @@ class GenerationParser:
         results: list[dict] = []
         for prompt_id, info in pending.items():
             outputs: list[str] = info.get("outputs", [])
-            output_path = outputs[0] if outputs else ""
+            raw_path = outputs[0] if outputs else ""
+            # Normalize: ComfyUI writes video_temp.mp4, final output is video.mp4
+            output_path = raw_path.replace("video_temp.mp4", "video.mp4")
             gen_type = cls._infer_type(output_path)
 
             start = info.get("start_time")
