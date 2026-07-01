@@ -10,8 +10,9 @@ class GenerationResultResponse(AppBaseSchema):
     step_name: str | None = None
     workflow_name: str | None = None
     file_path: str
-    relative_path: str = ""  # file_path relative to working_dir
+    relative_path: str = ""  # storage_path relative to working_dir (may contain caches/)
     storage_path: str = ""   # actual file location (may differ after cancel)
+    original_relative_path: str = ""  # file_path relative to working_dir (never caches/)
     thumbnail_path: str | None = None
     prompt_id: str
     generation_type: str
