@@ -1,6 +1,6 @@
 chat_model:
   init_args:
-    model: qwen3.7-plus-2026-05-26
+    model: qwen3.7-max
     model_provider: qwen
   max_requests_per_minute: 500
   max_requests_per_day: 2000

@@ -29,4 +29,5 @@ PROGRESS_STEPS = [
     ("shot_transition",    "生成镜头过渡"),
     ("scene_video",        "生成场景视频"),
     ("scene_transition",   "生成场景过渡"),
+    ("final",   "生成最终视频"),
 ]
