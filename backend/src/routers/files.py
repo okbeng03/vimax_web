@@ -2,6 +2,7 @@
 
 import difflib
 import json
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -124,7 +125,7 @@ async def serve_media(project_id: int, path: str, request: Request, db: AsyncSes
     headers = {
         "Content-Type": content_type,
         "Accept-Ranges": "bytes",
-        "Content-Disposition": f'inline; filename="{file_path.name}"',
+        "Content-Disposition": f"inline; filename*=UTF-8''{quote(file_path.name)}",
     }
 
     if range_header:
