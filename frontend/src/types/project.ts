@@ -3,7 +3,7 @@ export interface ProjectListItem {
   name: string;
   creative_description: string;
   working_dir: string;
-  status: "idle" | "running" | "completed" | "failed";
+  status: "idle" | "running" | "pending" | "completed" | "failed" | "success";
   template_name: string;
   current_step_name: string | null;
   step_summary: { total: number; completed: number; failed: number };
@@ -16,7 +16,7 @@ export interface ProjectDetail {
   name: string;
   creative_description: string;
   working_dir: string;
-  status: "idle" | "running" | "completed" | "failed";
+  status: "idle" | "running" | "pending" | "completed" | "failed" | "success";
   template_id: number;
   current_step_name: string | null;
   config: {

@@ -56,7 +56,7 @@ export default function ExecutionTab({
           </Tag>
         )}
         {finalStatus ? (
-          finalStatus.project_status === "completed" ? (
+          (finalStatus.project_status === "completed" || finalStatus.project_status === "success") ? (
             <Tag icon={<CheckCircleOutlined />} color="success">
               执行成功
             </Tag>

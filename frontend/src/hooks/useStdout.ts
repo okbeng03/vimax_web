@@ -43,7 +43,7 @@ export function useStdout(projectId: number | null, wsEnabled: boolean, projectS
       return statusMessages.length > 0 ? statusMessages[statusMessages.length - 1] : null;
     }
     // For non-running projects, derive finalStatus from projectStatus
-    if (projectStatus === "completed" || projectStatus === "failed") {
+    if (projectStatus === "completed" || projectStatus === "failed" || projectStatus === "success") {
       return { project_status: projectStatus };
     }
     return null;

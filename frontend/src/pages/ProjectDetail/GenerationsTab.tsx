@@ -12,18 +12,19 @@ interface Props {
   projectId: number;
   isRunning?: boolean;
   visible: boolean;
+  onGachaStart: () => void;
 }
 
-export default function GenerationsTab({ projectId, isRunning, visible }: Props) {
+export default function GenerationsTab({ projectId, isRunning, visible, onGachaStart }: Props) {
   const [results, setResults] = useState<GenerationResult[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [stepNames, setStepNames] = useState<string[]>([]);
   const [filterStep, setFilterStep] = useState<string | undefined>();
-  const [filterConfirmed, setFilterConfirmed] = useState<string>("unconfirmed"); // all / unconfirmed / confirmed
+  const [filterConfirmed, setFilterConfirmed] = useState<string>("all"); // all / unconfirmed / confirmed
   const [page, setPage] = useState(1);
-  const [collapseConfirmed, setCollapseConfirmed] = useState(true);
+  const [collapseConfirmed, setCollapseConfirmed] = useState(false);
   const [sortBy, setSortBy] = useState<string>("scene_shot");
   const [sortOrder, setSortOrder] = useState<string>("asc");
   const pageSize = 20;
@@ -131,7 +132,7 @@ export default function GenerationsTab({ projectId, isRunning, visible }: Props)
     }
   };
 
-  const handleOpenGacha = (generationId: number) => {
+  const handleOpenGacha = (generationId: number, scene: number, shot: number) => {
     // Infer gacha type from result
     const result = results.find((r) => r.id === generationId);
     let inferredType: "last_frame" | "first_frame" | "video" = "video";
@@ -141,6 +142,8 @@ export default function GenerationsTab({ projectId, isRunning, visible }: Props)
       else if (result.generation_type === "video") inferredType = "video";
     }
     setGachaType(inferredType);
+    setGachaScene(scene);
+    setGachaShot(shot);
     setGachaTargetId(generationId);
     setGachaOpen(true);
   };
@@ -153,7 +156,7 @@ export default function GenerationsTab({ projectId, isRunning, visible }: Props)
       await generationsApi.gachaGeneration(projectId, gachaTargetId, body);
       message.success("抽卡已启动，ViMax 运行中...");
       setGachaOpen(false);
-      // Refresh after a delay
+      onGachaStart();
       setTimeout(() => loadResults(), 3000);
     } catch (e: any) {
       message.error(e?.response?.data?.detail || "抽卡失败");

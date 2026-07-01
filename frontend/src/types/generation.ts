@@ -5,6 +5,7 @@ export interface GenerationResult {
   file_path: string;
   relative_path: string;
   storage_path: string;
+  original_relative_path: string;
   thumbnail_path: string | null;
   prompt_id: string;
   generation_type: "first_frame" | "last_frame" | "video" | "image" | "audio";

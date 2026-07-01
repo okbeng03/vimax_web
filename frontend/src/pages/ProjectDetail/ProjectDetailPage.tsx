@@ -34,6 +34,21 @@ export default function ProjectDetailPage() {
   const [yamlContent, setYamlContent] = useState("");
   const [pythonContent, setPythonContent] = useState("");
   const configLoadedRef = useRef(false);
+  const isComposingConfig = useRef(false);
+
+  // Shared IME-safe mount for config editors: block onChange during composition
+  const handleConfigEditorMount = useCallback((editor: any) => {
+    const domNode = editor.getDomNode();
+    if (!domNode) return;
+    const textarea = domNode.querySelector("textarea");
+    if (!textarea) return;
+    textarea.addEventListener("compositionstart", () => {
+      isComposingConfig.current = true;
+    });
+    textarea.addEventListener("compositionend", () => {
+      isComposingConfig.current = false;
+    });
+  }, []);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("config");
 
@@ -120,6 +135,19 @@ export default function ProjectDetailPage() {
       fetchSteps(Number(id));
       loadProgress();
     }
+
+    // ── Browser notification ──
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      const title = finalStatus.project_status === "completed"
+        ? "ViMax 执行完成"
+        : "ViMax 执行失败";
+      const errMsg = (finalStatus as any).error_message;
+      const body = errMsg || (finalStatus.project_status === "completed" ? "所有步骤已成功执行" : "执行过程中出现错误");
+      new Notification(title, { body });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission();
+    }
   }, [finalStatus, refreshGlobalRunning, fetchSteps, loadProgress, id, fetchProject]);
 
   // Only sync editor content on initial load — never overwrite user edits
@@ -146,6 +174,7 @@ export default function ProjectDetailPage() {
 
   // ---------- 开始生成 / 确认并继续 / 强制停止 ----------
   const isOtherRunning = globalRunningProjectId !== null && globalRunningProjectId !== pid;
+  const isTerminal = currentProject?.status === "completed" || currentProject?.status === "failed" || currentProject?.status === "success";
 
   // Show "确认并继续" when:
   //   a) WS is connected and sent step_ready, OR
@@ -294,7 +323,8 @@ export default function ProjectDetailPage() {
                       height="100%"
                       language="yaml"
                       value={yamlContent}
-                      onChange={(v) => setYamlContent(v || "")}
+                      onChange={(v) => { if (!isComposingConfig.current) setYamlContent(v || ""); }}
+                      onMount={handleConfigEditorMount}
                       theme="vs-dark"
                       options={{ minimap: { enabled: false }, fontSize: 13 }}
                     />
@@ -310,7 +340,8 @@ export default function ProjectDetailPage() {
                       height="100%"
                       language="python"
                       value={pythonContent}
-                      onChange={(v) => setPythonContent(v || "")}
+                      onChange={(v) => { if (!isComposingConfig.current) setPythonContent(v || ""); }}
+                      onMount={handleConfigEditorMount}
                       theme="vs-dark"
                       options={{ minimap: { enabled: false }, fontSize: 13 }}
                     />
@@ -353,7 +384,23 @@ export default function ProjectDetailPage() {
       ) : (
         "结果"
       ),
-      children: <GenerationsTab projectId={currentProject.id} isRunning={isProcessRunning} visible={activeTab === "generations"} />,
+      children: (
+        <GenerationsTab
+          projectId={currentProject.id}
+          isRunning={isProcessRunning}
+          visible={activeTab === "generations"}
+          onGachaStart={() => {
+            clear();
+            setGlobalRunningProjectId(pid);
+            useProjectStore.setState((state) => ({
+              currentProject: state.currentProject
+                ? { ...state.currentProject, status: "running" as const }
+                : null,
+            }));
+            setActiveTab("execution");
+          }}
+        />
+      ),
     },
     {
       key: "logs",
@@ -402,7 +449,7 @@ export default function ProjectDetailPage() {
               确认并继续下一步
             </Button>
           )}
-          {!isProcessRunning && !showContinue && (
+          {!isProcessRunning && !showContinue && !isTerminal && (
             <Button
               type="primary"
               icon={<PlayCircleOutlined />}
@@ -413,6 +460,11 @@ export default function ProjectDetailPage() {
             >
               {isOtherRunning ? "其他项目运行中" : startLabel}
             </Button>
+          )}
+          {!isProcessRunning && !showContinue && isTerminal && (
+            <Tag color={currentProject?.status === "completed" || currentProject?.status === "success" ? "success" : "error"} style={{ fontSize: 14, padding: "4px 12px" }}>
+              {currentProject?.status === "completed" || currentProject?.status === "success" ? "✓ 已完成" : "✗ 已终止"}
+            </Tag>
           )}
         </div>
       </div>

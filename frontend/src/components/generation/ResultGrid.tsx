@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Row, Col, Typography, Divider, Button, Modal, Spin, message, Space } from "antd";
 import { EditOutlined, CheckOutlined } from "@ant-design/icons";
 import MonacoEditor from "@monaco-editor/react";
@@ -16,7 +16,7 @@ interface Props {
   onConfirm: (id: number) => void;
   onCancel: (id: number) => void;
   onRecover: (id: number) => void;
-  onGacha: (id: number) => void;
+  onGacha: (id: number, scene: number, shot: number) => void;
   onRetry: (id: number) => void;
 }
 
@@ -29,7 +29,8 @@ function groupKey(r: GenerationResult): string {
 
 /** Derive shot_description.json path from an item in the group */
 function getShotDescriptionPath(item: GenerationResult): string {
-  const rel = item.relative_path;
+  // Use original_relative_path — never contains caches/ prefix
+  const rel = item.original_relative_path || item.relative_path;
   const dir = rel.includes("/") ? rel.substring(0, rel.lastIndexOf("/") + 1) : "";
   return dir + "shot_description.json";
 }
@@ -43,6 +44,7 @@ function ShotDescriptionEditor({ projectId, item }: { projectId: number; item: G
   const [dirty, setDirty] = useState(false);
   const path = getShotDescriptionPath(item);
   const originalRef = { current: "" };
+  const isComposing = useRef(false);
 
   const handleOpen = async () => {
     setOpen(true);
@@ -144,7 +146,7 @@ export default function ResultGrid({ projectId, results, grouped, onConfirm, onC
               onConfirm={() => onConfirm(r.id)}
               onCancel={() => onCancel(r.id)}
               onRecover={() => onRecover(r.id)}
-              onGacha={() => onGacha(r.id)}
+              onGacha={(s, sh) => onGacha(r.id, s, sh)}
               onRetry={() => onRetry(r.id)}
             />
           </Col>
@@ -187,7 +189,7 @@ export default function ResultGrid({ projectId, results, grouped, onConfirm, onC
                   onConfirm={() => onConfirm(r.id)}
                   onCancel={() => onCancel(r.id)}
                   onRecover={() => onRecover(r.id)}
-                  onGacha={() => onGacha(r.id)}
+                  onGacha={(s, sh) => onGacha(r.id, s, sh)}
                   onRetry={() => onRetry(r.id)}
                 />
               </Col>
