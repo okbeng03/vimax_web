@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import { Button, Popconfirm } from "antd";
 import { SaveOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -29,17 +29,58 @@ export default function TextEditor({ path, content, onChange, onSave, saving, on
   const originalRef = useRef(content);
   const [dirty, setDirty] = useState(false);
 
+  // IME composition guard — skip onChange callback during composition
+  const isComposing = useRef(false);
+  const composeValueRef = useRef(content);
+
   // Reset baseline when file path changes (new file loaded)
   useEffect(() => {
     originalRef.current = content;
+    composeValueRef.current = content;
     setDirty(false);
   }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleChange = (v: string | undefined) => {
+  const handleBeforeMount = useCallback((monaco: any) => {
+    // Override the editor creation to intercept composition events early
+  }, []);
+
+  const handleMount = useCallback((editor: any) => {
+    const domNode = editor.getDomNode();
+    if (!domNode) return;
+    // Monaco's underlying textarea emits composition events
+    const textarea = domNode.querySelector("textarea");
+    if (!textarea) return;
+
+    const onCompositionStart = () => {
+      isComposing.current = true;
+    };
+    const onCompositionEnd = () => {
+      isComposing.current = false;
+      // After IME commits, push the final value up
+      const finalValue = editor.getValue();
+      composeValueRef.current = finalValue;
+      onChange(finalValue);
+      setDirty(finalValue !== originalRef.current);
+    };
+
+    textarea.addEventListener("compositionstart", onCompositionStart);
+    textarea.addEventListener("compositionend", onCompositionEnd);
+
+    // Cleanup not strictly necessary for single mount, but good practice
+    return () => {
+      textarea.removeEventListener("compositionstart", onCompositionStart);
+      textarea.removeEventListener("compositionend", onCompositionEnd);
+    };
+  }, [onChange]);
+
+  const handleChange = useCallback((v: string | undefined) => {
     const val = v || "";
+    composeValueRef.current = val;
+    // During IME composition, don't push intermediate pinyin to parent
+    if (isComposing.current) return;
     onChange(val);
     setDirty(val !== originalRef.current);
-  };
+  }, [onChange]);
 
   const editor = (
     <MonacoEditor
@@ -47,6 +88,8 @@ export default function TextEditor({ path, content, onChange, onSave, saving, on
       language={lang}
       value={content}
       onChange={handleChange}
+      beforeMount={handleBeforeMount}
+      onMount={handleMount}
       theme="vs-dark"
       options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }}
     />
