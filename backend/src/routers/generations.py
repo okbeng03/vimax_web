@@ -4,6 +4,7 @@ import asyncio
 import os
 import re
 import shutil
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -54,6 +55,15 @@ def _compute_relative(file_path: str, working_dir: str) -> str:
         return str(Path(file_path).relative_to(working_dir))
     except ValueError:
         return file_path
+
+
+def _cached_path(file_path: str, working_dir: str) -> Path:
+    """Build a caches/ path with a short hash suffix to avoid overwrites on re-cancel."""
+    rel = _compute_relative(file_path, working_dir)
+    p = Path(rel)
+    tag = uuid.uuid4().hex[:8]
+    stem = f"{p.stem}_{tag}"
+    return Path(working_dir) / "caches" / p.parent / f"{stem}{p.suffix}"
 
 
 def _extract_scene_shot(file_path: str) -> tuple[int | None, int | None]:
@@ -132,6 +142,7 @@ async def list_generations(
             file_path=g.file_path,
             relative_path=_compute_relative(storage, working_dir),
             storage_path=storage,
+            original_relative_path=_compute_relative(g.file_path, working_dir),
             thumbnail_path=g.thumbnail_path,
             prompt_id=g.prompt_id,
             workflow_name=g.workflow_name,
@@ -232,10 +243,8 @@ async def cancel_generation(project_id: int, generation_id: int, db: AsyncSessio
     if not src.exists():
         raise HTTPException(status_code=404, detail=f"File not found: {current_path}")
 
-    # Compute relative path and target in caches
-    rel = _compute_relative(gen.file_path, project.working_dir)
-    cache_dir = Path(project.working_dir) / "caches"
-    dst = cache_dir / rel
+    # Build caches target with hash suffix to avoid overwrites on re-cancel
+    dst = _cached_path(gen.file_path, project.working_dir)
     dst.parent.mkdir(parents=True, exist_ok=True)
 
     # Move file
@@ -244,9 +253,14 @@ async def cancel_generation(project_id: int, generation_id: int, db: AsyncSessio
     # Update storage_path to new location
     gen.storage_path = str(dst)
 
-    summary = f"Cancelled generation result: {gen.prompt_id}, moved to caches/{rel}"
+    # Compute readable relative path for log
+    try:
+        log_rel = str(dst.relative_to(project.working_dir))
+    except ValueError:
+        log_rel = str(dst)
+    summary = f"Cancelled generation result: {gen.prompt_id}, moved to {log_rel}"
     if was_confirmed:
-        summary = f"Un-confirmed & cancelled: {gen.prompt_id}, moved to caches/{rel}"
+        summary = f"Un-confirmed & cancelled: {gen.prompt_id}, moved to {log_rel}"
 
     db.add(OperationLog(
         project_id=project_id,
@@ -337,17 +351,11 @@ async def gacha_generation(
     if not step or not project:
         raise HTTPException(status_code=404, detail="Step or project not found")
 
-    # Only allow gacha for scene/shot steps
-    if step.name not in GACHA_STEP_NAMES:
-        raise HTTPException(status_code=400, detail=f"Gacha only available for scene/shot steps, got: {step.name}")
-
-    # ── Step 1: Cancel (move file to caches) ──
+    # ── Step 1: Cancel (move file to caches with hash suffix) ──
     current_path = gen.storage_path or gen.file_path
     src = Path(current_path)
     if src.exists():
-        rel = _compute_relative(gen.file_path, project.working_dir)
-        cache_dir = Path(project.working_dir) / "caches"
-        dst = cache_dir / rel
+        dst = _cached_path(gen.file_path, project.working_dir)
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
         gen.storage_path = str(dst)
