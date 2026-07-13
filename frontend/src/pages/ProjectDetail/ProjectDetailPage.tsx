@@ -101,7 +101,10 @@ export default function ProjectDetailPage() {
   // ---------- project data ----------
   useEffect(() => {
     if (id) {
-      configLoadedRef.current = false;  // reset for new project
+      // Immediately clear old project's editor content to avoid flash
+      setYamlContent("");
+      setPythonContent("");
+      configLoadedRef.current = false;
       fetchProject(Number(id));
       loadProgress();
     }
@@ -152,12 +155,17 @@ export default function ProjectDetailPage() {
 
   // Only sync editor content on initial load — never overwrite user edits
   useEffect(() => {
-    if (!configLoadedRef.current && currentProject?.config) {
+    const targetId = Number(id);
+    if (
+      !configLoadedRef.current &&
+      currentProject?.config &&
+      currentProject.id === targetId
+    ) {
       setYamlContent(currentProject.config.yaml_content);
       setPythonContent(currentProject.config.config_py_content);
       configLoadedRef.current = true;
     }
-  }, [currentProject]);
+  }, [currentProject, id]);
 
   const handleSaveConfig = async () => {
     if (!id) return;
@@ -320,6 +328,7 @@ export default function ProjectDetailPage() {
                 {(fs: boolean) => (
                   <div style={{ height: fs ? "100%" : 400 }}>
                     <MonacoEditor
+                      key={`yaml-${id}`}
                       height="100%"
                       language="yaml"
                       value={yamlContent}
@@ -337,6 +346,7 @@ export default function ProjectDetailPage() {
                 {(fs: boolean) => (
                   <div style={{ height: fs ? "100%" : 400 }}>
                     <MonacoEditor
+                      key={`python-${id}`}
                       height="100%"
                       language="python"
                       value={pythonContent}
@@ -492,7 +502,7 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
+      <Tabs key={id} activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
     </div>
   );
 }

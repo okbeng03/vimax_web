@@ -9,6 +9,7 @@ import {
   SoundOutlined,
   FileOutlined,
   EditOutlined,
+  PictureOutlined,
 } from "@ant-design/icons";
 import MonacoEditor from "@monaco-editor/react";
 import type { GenerationResult } from "../../types/generation";
@@ -45,6 +46,60 @@ function getPromptRelPath(resultRelPath: string, promptFile: string): string {
     ? resultRelPath.substring(0, resultRelPath.lastIndexOf("/") + 1)
     : "";
   return dir + promptFile;
+}
+
+// ── Image lazy-loading via IntersectionObserver ──
+function useInViewport(rootMargin = "200px") {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // If already visible, render immediately
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight + 100) {
+      setInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootMargin]);
+
+  return { ref, inView };
+}
+
+function LazyImage({ src, alt, style }: { src: string; alt: string; style?: React.CSSProperties }) {
+  const { ref, inView } = useInViewport();
+  const height = 180;
+
+  if (!inView) {
+    return (
+      <div ref={ref} style={{ height, backgroundColor: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <PictureOutlined style={{ fontSize: 32, color: "#ddd" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} style={{ height, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f5", cursor: "pointer" }}>
+      <Image
+        src={src}
+        alt={alt}
+        style={{ maxHeight: height, objectFit: "cover", ...style }}
+        fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjEyIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+5Zu+54mH5Yqg6L295aSx6LSlPC90ZXh0Pjwvc3ZnPg=="
+      />
+    </div>
+  );
 }
 
 interface Props {
@@ -178,18 +233,7 @@ export default function ResultCard({ projectId, result, onConfirm, onCancel, onR
 
     // ── Image ──
     if (isImage(result.file_path)) {
-      return (
-        <div
-          style={{ height: previewHeight, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f5", cursor: "pointer" }}
-        >
-          <Image
-            src={mediaSrc}
-            alt={result.relative_path}
-            style={{ maxHeight: previewHeight, objectFit: "cover" }}
-            fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjEyIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiI+5Zu+54mH5Yqg6L295aSx6LSlPC90ZXh0Pjwvc3ZnPg=="
-          />
-        </div>
-      );
+      return <LazyImage src={mediaSrc} alt={result.relative_path} />;
     }
 
     // ── Audio ──
