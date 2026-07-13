@@ -21,15 +21,24 @@ from src.services.vimax_runner import vimax_runner
 from pathlib import Path as _Path
 _log_dir = _Path("data")
 _log_dir.mkdir(exist_ok=True)
+
+_log_fmt = logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+
 _fh = logging.FileHandler(_log_dir / "app.log", encoding="utf-8")
 _fh.setLevel(logging.INFO)
-_fh.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
+_fh.setFormatter(_log_fmt)
 _fh.stream.reconfigure(line_buffering=True)  # ensure immediate flush
 
-for _name in ("src.services.vimax_runner", "src.routers.steps", "src.main"):
+_sh = logging.StreamHandler()
+_sh.setLevel(logging.INFO)
+_sh.setFormatter(_log_fmt)
+
+_APP_LOGGERS = ("src.services.vimax_runner", "src.routers.steps", "src.routers.operations", "src.main")
+for _name in _APP_LOGGERS:
     _l = logging.getLogger(_name)
     _l.setLevel(logging.INFO)
     _l.addHandler(_fh)
+    _l.addHandler(_sh)
 
 logger = logging.getLogger(__name__)
 

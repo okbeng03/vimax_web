@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Select, Switch, Button, Space, Empty, Spin, Typography, Divider, Modal, InputNumber, Radio, message } from "antd";
-import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
+import { Select, Switch, Button, Space, Empty, Spin, Typography, Divider, Modal, InputNumber, Radio, message, Tooltip } from "antd";
+import { EyeOutlined, EyeInvisibleOutlined, PlayCircleOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
 import ResultGrid from "../../components/generation/ResultGrid";
 import * as generationsApi from "../../api/generations";
 import * as stepsApi from "../../api/steps";
+import * as projectsApi from "../../api/projects";
 import type { GenerationResult, GachaRequest } from "../../types/generation";
 
 const { Text } = Typography;
@@ -179,6 +180,15 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
     setPage(newPage);
   };
 
+  const handleBatchProcess = async () => {
+    try {
+      const res = await projectsApi.batchProcessVideo(projectId);
+      message.success(res.message);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "批量处理失败");
+    }
+  };
+
   return (
     <div>
       {/* Filter bar */}
@@ -230,6 +240,15 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
         >
           {sortOrder === "asc" ? "↑ 升序" : "↓ 降序"}
         </Button>
+        {results.length > 0 && (
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            onClick={handleBatchProcess}
+          >
+            批量处理视频
+          </Button>
+        )}
       </Space>
 
       {/* Content */}
@@ -270,24 +289,60 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
             onRetry={handleRetry}
           />
           {totalPages > 1 && (
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <Space>
+            <div
+              style={{
+                position: "fixed",
+                right: 24,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 100,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 8,
+                background: "rgba(255,255,255,0.92)",
+                backdropFilter: "blur(8px)",
+                borderRadius: 12,
+                padding: "12px 8px",
+                boxShadow: "0 2px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)",
+              }}
+            >
+              <Tooltip title="上一页" placement="left">
                 <Button
+                  type="text"
+                  shape="circle"
+                  icon={<LeftOutlined />}
                   disabled={page <= 1}
                   onClick={() => handlePageChange(page - 1)}
-                >
-                  上一页
-                </Button>
-                <Text>
-                  第 {page} / {totalPages} 页
-                </Text>
+                  style={{ width: 36, height: 36 }}
+                />
+              </Tooltip>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#666",
+                  textAlign: "center",
+                  lineHeight: 1.2,
+                  userSelect: "none",
+                }}
+              >
+                {page}
+                <br />
+                <span style={{ fontSize: 10, color: "#aaa" }}>—</span>
+                <br />
+                {totalPages}
+              </Text>
+              <Tooltip title="下一页" placement="left">
                 <Button
+                  type="text"
+                  shape="circle"
+                  icon={<RightOutlined />}
                   disabled={page >= totalPages}
                   onClick={() => handlePageChange(page + 1)}
-                >
-                  下一页
-                </Button>
-              </Space>
+                  style={{ width: 36, height: 36 }}
+                />
+              </Tooltip>
             </div>
           )}
         </>

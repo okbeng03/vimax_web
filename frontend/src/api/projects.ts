@@ -54,3 +54,8 @@ export async function fetchProjectStdout(projectId: number): Promise<{ content: 
   const { data } = await client.get(`/projects/${projectId}/stdout`);
   return data;
 }
+
+export async function batchProcessVideo(projectId: number): Promise<{ message: string }> {
+  const { data } = await client.post(`/projects/${projectId}/batch-process-video`);
+  return data;
+}
