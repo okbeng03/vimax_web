@@ -29,6 +29,7 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
   const [sortBy, setSortBy] = useState<string>("scene_shot");
   const [sortOrder, setSortOrder] = useState<string>("asc");
   const pageSize = 20;
+  const resultsTopRef = useRef<HTMLDivElement>(null);
 
   // Gacha modal state
   const [gachaOpen, setGachaOpen] = useState(false);
@@ -177,6 +178,7 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
   };
 
   const handlePageChange = (newPage: number) => {
+    resultsTopRef.current?.scrollIntoView({ behavior: "instant" });
     setPage(newPage);
   };
 
@@ -252,6 +254,7 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
       </Space>
 
       {/* Content */}
+      <div ref={resultsTopRef}>
       {loading && results.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60 }}>
           <Spin />
@@ -347,6 +350,7 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
           )}
         </>
       )}
+      </div>
 
       {/* Gacha config modal */}
       <Modal
