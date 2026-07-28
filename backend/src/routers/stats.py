@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_db
 from src.services.statistics import StatisticsService
-from src.schemas.statistics import ProjectStatsResponse, GlobalStatsResponse, CorrelationResponse
+from src.schemas.statistics import ProjectStatsResponse, GlobalStatsResponse, CorrelationResponse, ProjectComparisonResponse
 
 router = APIRouter(prefix="/api", tags=["statistics"])
 
@@ -25,3 +25,9 @@ async def project_statistics(project_id: int, db: AsyncSession = Depends(get_db)
 async def edit_correlation(project_id: int, db: AsyncSession = Depends(get_db)):
     """FR-026: Edit-success correlation analysis."""
     return await StatisticsService.edit_success_correlation(db, project_id)
+
+
+@router.get("/statistics/comparison", response_model=ProjectComparisonResponse)
+async def project_comparison(db: AsyncSession = Depends(get_db)):
+    """跨项目对比：成功/失败、耗时、重试统计"""
+    return await StatisticsService.project_comparison(db)

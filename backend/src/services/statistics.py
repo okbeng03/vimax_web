@@ -1,7 +1,7 @@
 """Statistics computation service."""
 
 from datetime import datetime, timedelta
-from sqlalchemy import select, func, and_, or_, case
+from sqlalchemy import select, func, and_, or_, case, Float
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.project import Project
 from src.models.step import Step
@@ -439,6 +439,134 @@ class StatisticsService:
             "failure_reasons": failure_map,
             "trend": {"daily": daily, "weekly": weekly},
         }
+
+    @staticmethod
+    async def project_comparison(db: AsyncSession) -> dict:
+        """Cross-project comparison: success/failure, duration, retries."""
+        # ── Generation stats subquery ──
+        gen_sub = (
+            select(
+                GenerationResult.project_id,
+                func.count(GenerationResult.id).label("gen_total"),
+                func.sum(case((GenerationResult.error_message.is_(None), 1), else_=0)).label("gen_success"),
+                func.sum(case((GenerationResult.error_message.isnot(None), 1), else_=0)).label("gen_failed"),
+                func.coalesce(func.sum(GenerationResult.duration_seconds), 0).label("total_duration"),
+                func.coalesce(func.avg(GenerationResult.duration_seconds), 0).label("avg_duration"),
+                func.coalesce(func.max(GenerationResult.duration_seconds), 0).label("max_duration"),
+                func.coalesce(func.min(GenerationResult.duration_seconds), 0).label("min_duration"),
+            )
+            .group_by(GenerationResult.project_id)
+            .subquery()
+        )
+
+        # ── Step retry stats subquery ──
+        step_sub = (
+            select(
+                Step.project_id,
+                func.count(Step.id).label("step_count"),
+                func.coalesce(func.sum(Step.retry_count), 0).label("total_retries"),
+                func.coalesce(func.avg(func.cast(Step.retry_count, Float)), 0).label("avg_retries"),
+                func.coalesce(func.max(Step.retry_count), 0).label("max_retries"),
+            )
+            .group_by(Step.project_id)
+            .subquery()
+        )
+
+        result = await db.execute(
+            select(
+                Project.id,
+                Project.name,
+                Project.status,
+                Project.completed_at,
+                func.coalesce(gen_sub.c.gen_total, 0).label("gen_total"),
+                func.coalesce(gen_sub.c.gen_success, 0).label("gen_success"),
+                func.coalesce(gen_sub.c.gen_failed, 0).label("gen_failed"),
+                func.coalesce(gen_sub.c.total_duration, 0.0).label("total_duration"),
+                func.coalesce(gen_sub.c.avg_duration, 0.0).label("avg_duration"),
+                func.coalesce(gen_sub.c.max_duration, 0.0).label("max_duration"),
+                func.coalesce(gen_sub.c.min_duration, 0.0).label("min_duration"),
+                func.coalesce(step_sub.c.step_count, 0).label("step_count"),
+                func.coalesce(step_sub.c.total_retries, 0).label("total_retries"),
+                func.coalesce(step_sub.c.avg_retries, 0.0).label("avg_retries"),
+                func.coalesce(step_sub.c.max_retries, 0).label("max_retries"),
+            )
+            .select_from(Project)
+            .outerjoin(gen_sub, gen_sub.c.project_id == Project.id)
+            .outerjoin(step_sub, step_sub.c.project_id == Project.id)
+            .order_by(Project.completed_at.desc().nullslast(), Project.id.desc())
+        )
+
+        projects: list[dict] = []
+        for row in result:
+            gen_total = int(row.gen_total)
+            projects.append({
+                "project_id": int(row.id),
+                "project_name": row.name,
+                "status": row.status,
+                "generation_total": gen_total,
+                "generation_success": int(row.gen_success),
+                "generation_failed": int(row.gen_failed),
+                "generation_success_rate": round(int(row.gen_success) / gen_total, 4) if gen_total else 0.0,
+                "total_duration_seconds": round(float(row.total_duration), 1),
+                "avg_duration_seconds": round(float(row.avg_duration), 1),
+                "max_duration_seconds": round(float(row.max_duration), 1),
+                "min_duration_seconds": round(float(row.min_duration), 1),
+                "total_retries": int(row.total_retries),
+                "avg_retries_per_step": round(float(row.avg_retries), 1),
+                "max_retries_per_step": int(row.max_retries),
+                "step_count": int(row.step_count),
+                "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+            })
+
+        # ── Compute summary ──
+        if projects:
+            rates = [p["generation_success_rate"] for p in projects]
+            durations = [p["avg_duration_seconds"] for p in projects if p["avg_duration_seconds"] > 0]
+            retries = [p["avg_retries_per_step"] for p in projects]
+
+            max_rate_idx = rates.index(max(rates))
+            min_rate_idx = rates.index(min(rates))
+
+            avg_duration = round(sum(durations) / len(durations), 1) if durations else 0.0
+            avg_retries = round(sum(retries) / len(retries), 1) if retries else 0.0
+
+            max_dur_idx = max(range(len(projects)), key=lambda i: projects[i]["avg_duration_seconds"])
+            min_dur_idx = min(range(len(projects)), key=lambda i: projects[i]["avg_duration_seconds"]) if any(p["avg_duration_seconds"] > 0 for p in projects) else 0
+
+            max_ret_idx = max(range(len(projects)), key=lambda i: projects[i]["avg_retries_per_step"])
+            min_ret_idx = min(range(len(projects)), key=lambda i: projects[i]["avg_retries_per_step"])
+
+            summary = {
+                "avg_success_rate": round(sum(rates) / len(rates), 4),
+                "max_success_rate": round(max(rates), 4),
+                "max_success_rate_project": projects[max_rate_idx]["project_name"],
+                "min_success_rate": round(min(rates), 4),
+                "min_success_rate_project": projects[min_rate_idx]["project_name"],
+                "avg_duration_seconds": avg_duration,
+                "max_duration_seconds": round(projects[max_dur_idx]["avg_duration_seconds"], 1),
+                "max_duration_project": projects[max_dur_idx]["project_name"],
+                "min_duration_seconds": round(projects[min_dur_idx]["avg_duration_seconds"], 1),
+                "min_duration_project": projects[min_dur_idx]["project_name"],
+                "avg_retries_per_project": avg_retries,
+                "max_retries_per_project": int(projects[max_ret_idx]["max_retries_per_step"]),
+                "max_retries_project": projects[max_ret_idx]["project_name"],
+                "min_retries_per_project": int(projects[min_ret_idx]["max_retries_per_step"]),
+                "min_retries_project": projects[min_ret_idx]["project_name"],
+            }
+        else:
+            summary = {
+                "avg_success_rate": 0.0,
+                "max_success_rate": 0.0, "max_success_rate_project": "",
+                "min_success_rate": 0.0, "min_success_rate_project": "",
+                "avg_duration_seconds": 0.0,
+                "max_duration_seconds": 0.0, "max_duration_project": "",
+                "min_duration_seconds": 0.0, "min_duration_project": "",
+                "avg_retries_per_project": 0.0,
+                "max_retries_per_project": 0, "max_retries_project": "",
+                "min_retries_per_project": 0, "min_retries_project": "",
+            }
+
+        return {"projects": projects, "summary": summary}
 
     @staticmethod
     async def edit_success_correlation(db: AsyncSession, project_id: int) -> dict:

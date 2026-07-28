@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Typography, Space } from "antd";
 import StatsDashboard from "../../components/stats/StatsDashboard";
 import TrendChart from "../../components/stats/TrendChart";
+import ProjectComparison from "../../components/stats/ProjectComparison";
 import * as statsApi from "../../api/stats";
 import type { GlobalStats } from "../../types/statistics";
 
@@ -23,6 +24,7 @@ export default function StatisticsPage() {
         <StatsDashboard stats={stats} loading={loading} />
         <TrendChart data={stats?.trend?.daily || []} title="每日趋势" />
         <TrendChart data={stats?.trend?.weekly || []} title="每周趋势" />
+        <ProjectComparison />
       </Space>
     </div>
   );

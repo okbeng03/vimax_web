@@ -116,3 +116,48 @@ class CorrelationResponse(AppBaseSchema):
     project_id: int
     correlations: list
     summary: str
+
+
+# ── Cross-project comparison schemas ──
+
+class ProjectComparisonItem(AppBaseSchema):
+    project_id: int
+    project_name: str
+    status: str
+    generation_total: int = 0
+    generation_success: int = 0
+    generation_failed: int = 0
+    generation_success_rate: float = 0.0
+    total_duration_seconds: float = 0.0
+    avg_duration_seconds: float = 0.0
+    max_duration_seconds: float = 0.0
+    min_duration_seconds: float = 0.0
+    total_retries: int = 0
+    avg_retries_per_step: float = 0.0
+    max_retries_per_step: int = 0
+    step_count: int = 0
+    completed_at: str | None = None
+
+
+class ProjectComparisonSummary(AppBaseSchema):
+    """Aggregated min/max/avg across all projects."""
+    avg_success_rate: float = 0.0
+    max_success_rate: float = 0.0
+    max_success_rate_project: str = ""
+    min_success_rate: float = 0.0
+    min_success_rate_project: str = ""
+    avg_duration_seconds: float = 0.0
+    max_duration_seconds: float = 0.0
+    max_duration_project: str = ""
+    min_duration_seconds: float = 0.0
+    min_duration_project: str = ""
+    avg_retries_per_project: float = 0.0
+    max_retries_per_project: int = 0
+    max_retries_project: str = ""
+    min_retries_per_project: int = 0
+    min_retries_project: str = ""
+
+
+class ProjectComparisonResponse(AppBaseSchema):
+    projects: list[ProjectComparisonItem]
+    summary: ProjectComparisonSummary

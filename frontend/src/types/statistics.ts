@@ -100,3 +100,47 @@ export interface TrendPoint {
   success: number;
   failed: number;
 }
+
+// ── Cross-project comparison types ──
+
+export interface ProjectComparisonItem {
+  project_id: number;
+  project_name: string;
+  status: string;
+  generation_total: number;
+  generation_success: number;
+  generation_failed: number;
+  generation_success_rate: number;
+  total_duration_seconds: number;
+  avg_duration_seconds: number;
+  max_duration_seconds: number;
+  min_duration_seconds: number;
+  total_retries: number;
+  avg_retries_per_step: number;
+  max_retries_per_step: number;
+  step_count: number;
+  completed_at: string | null;
+}
+
+export interface ProjectComparisonSummary {
+  avg_success_rate: number;
+  max_success_rate: number;
+  max_success_rate_project: string;
+  min_success_rate: number;
+  min_success_rate_project: string;
+  avg_duration_seconds: number;
+  max_duration_seconds: number;
+  max_duration_project: string;
+  min_duration_seconds: number;
+  min_duration_project: string;
+  avg_retries_per_project: number;
+  max_retries_per_project: number;
+  max_retries_project: string;
+  min_retries_per_project: number;
+  min_retries_project: string;
+}
+
+export interface ProjectComparisonResponse {
+  projects: ProjectComparisonItem[];
+  summary: ProjectComparisonSummary;
+}

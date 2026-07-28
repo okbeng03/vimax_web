@@ -1,5 +1,5 @@
 import client from "./client";
-import type { GlobalStats, ProjectStats } from "../types/statistics";
+import type { GlobalStats, ProjectStats, ProjectComparisonResponse } from "../types/statistics";
 
 export async function fetchGlobalStats(): Promise<GlobalStats> {
   const { data } = await client.get("/statistics/overview");
@@ -8,5 +8,10 @@ export async function fetchGlobalStats(): Promise<GlobalStats> {
 
 export async function fetchProjectStats(projectId: number): Promise<ProjectStats> {
   const { data } = await client.get(`/projects/${projectId}/statistics`);
+  return data;
+}
+
+export async function fetchProjectComparison(): Promise<ProjectComparisonResponse> {
+  const { data } = await client.get("/statistics/comparison");
   return data;
 }
