@@ -13,6 +13,13 @@ image_generator:
   max_requests_per_day: null
 
 video_generator:
+  class_path: tools.VideoGeneratorComfyUIMiniMax
+  init_args:
+    base_url: http://192.168.3.4:8188
+  max_requests_per_minute: null
+  max_requests_per_day: null
+
+minor_video_generator:
   class_path: tools.VideoGeneratorComfyUILTX
   init_args:
     base_url: http://192.168.3.4:8188

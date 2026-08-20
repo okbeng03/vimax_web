@@ -59,3 +59,8 @@ export async function batchProcessVideo(projectId: number): Promise<{ message: s
   const { data } = await client.post(`/projects/${projectId}/batch-process-video`);
   return data;
 }
+
+export async function collectDoubao(projectId: number): Promise<{ message: string }> {
+  const { data } = await client.post(`/projects/${projectId}/collect-doubao`);
+  return data;
+}

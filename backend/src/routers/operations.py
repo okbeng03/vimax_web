@@ -1,8 +1,9 @@
-"""Operations API router — view operation logs and batch video processing."""
+"""Operations API router — view operation logs, batch video processing, doubao collection."""
 
 import json
 import logging
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -125,6 +126,90 @@ def _process_videos(working_dir: str, project_id: int) -> None:
     )
 
 
+def _collect_doubao(working_dir: str, project_id: int) -> None:
+    """Background task: collect doubao.mp4 and flac files from scene_N/shots/N/.
+
+    1. Create doubao/ directory under working_dir
+    2. Scan scene_N/shots/N/ directories
+    3. Copy doubao.mp4 → doubao/{scene_idx}_{shot_idx}.mp4
+    4. Copy digit-starting *.flac → doubao/{scene_idx}_{shot_idx}_{idx}.flac
+    """
+    base = Path(working_dir)
+    doubao_dir = base / "doubao"
+    doubao_dir.mkdir(parents=True, exist_ok=True)
+
+    scene_pattern = re.compile(r"^scene[_\s]*(\d+)$", re.IGNORECASE)
+    collected_mp4 = 0
+    collected_flac = 0
+    errors = 0
+
+    for scene_entry in sorted(base.iterdir()):
+        if not scene_entry.is_dir():
+            continue
+        sm = scene_pattern.match(scene_entry.name)
+        if not sm:
+            continue
+        scene_idx = int(sm.group(1))
+
+        shots_dir = scene_entry / "shots"
+        if not shots_dir.is_dir():
+            continue
+
+        for shot_entry in sorted(shots_dir.iterdir()):
+            if not shot_entry.is_dir():
+                continue
+            try:
+                shot_idx = int(shot_entry.name)
+            except ValueError:
+                continue
+
+            # ── 3. Copy doubao.mp4 + digit-starting flac files ──
+            doubao_path = shot_entry / "doubao.mp4"
+            if doubao_path.exists():
+                dest_name = f"{scene_idx}_{shot_idx}.mp4"
+                dest_path = doubao_dir / dest_name
+                try:
+                    shutil.copy2(doubao_path, dest_path)
+                    logger.info(
+                        "scene_%d shot_%d: copied doubao.mp4 → %s",
+                        scene_idx, shot_idx, dest_name,
+                    )
+                    collected_mp4 += 1
+                except OSError as e:
+                    logger.error(
+                        "scene_%d shot_%d: failed to copy doubao.mp4: %s",
+                        scene_idx, shot_idx, e,
+                    )
+                    errors += 1
+
+                # ── 4. Only collect flac when doubao.mp4 exists ──
+                flac_files = sorted(
+                    f for f in shot_entry.glob("*.flac")
+                    if re.match(r"^\d", f.name)
+                )
+                for idx, flac_path in enumerate(flac_files, start=1):
+                    dest_name = f"{scene_idx}_{shot_idx}_{idx}.flac"
+                    dest_path = doubao_dir / dest_name
+                    try:
+                        shutil.copy2(flac_path, dest_path)
+                        logger.info(
+                            "scene_%d shot_%d: copied %s → %s",
+                            scene_idx, shot_idx, flac_path.name, dest_name,
+                        )
+                        collected_flac += 1
+                    except OSError as e:
+                        logger.error(
+                            "scene_%d shot_%d: failed to copy %s: %s",
+                            scene_idx, shot_idx, flac_path.name, e,
+                        )
+                        errors += 1
+
+    logger.info(
+        "Doubao collection for project_id=%s finished: mp4=%d flac=%d errors=%d → %s",
+        project_id, collected_mp4, collected_flac, errors, str(doubao_dir),
+    )
+
+
 @router.get("/{project_id}/operations", response_model=OperationLogListResponse)
 async def list_operations(
     project_id: int,
@@ -195,3 +280,27 @@ async def batch_process_video(
     background_tasks.add_task(_process_videos, working_dir, project_id)
 
     return {"message": "批量处理已启动，请查看服务端日志了解进度"}
+
+
+@router.post("/{project_id}/collect-doubao")
+async def collect_doubao(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """收集豆包素材：扫描 scene_N/shots/N/ 中的 doubao.mp4 和 .flac 文件，
+    复制到 working_dir/doubao/ 目录下统一管理。
+    """
+    proj_result = await db.execute(select(Project).where(Project.id == project_id))
+    project = proj_result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    working_dir = project.working_dir
+    if not working_dir or not Path(working_dir).exists():
+        raise HTTPException(status_code=400, detail="Working directory not found")
+
+    logger.info("Starting doubao collection for project_id=%s", project_id)
+    background_tasks.add_task(_collect_doubao, working_dir, project_id)
+
+    return {"message": "豆包素材收集已启动，素材将保存至 working_dir/doubao/ 目录"}

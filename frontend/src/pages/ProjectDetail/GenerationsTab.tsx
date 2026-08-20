@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Select, Switch, Button, Space, Empty, Spin, Typography, Divider, Modal, InputNumber, Radio, message, Tooltip } from "antd";
-import { EyeOutlined, EyeInvisibleOutlined, PlayCircleOutlined, LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { EyeOutlined, EyeInvisibleOutlined, PlayCircleOutlined, LeftOutlined, RightOutlined, FolderAddOutlined } from "@ant-design/icons";
 import ResultGrid from "../../components/generation/ResultGrid";
 import * as generationsApi from "../../api/generations";
 import * as stepsApi from "../../api/steps";
@@ -191,6 +191,15 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
     }
   };
 
+  const handleCollectDoubao = async () => {
+    try {
+      const res = await projectsApi.collectDoubao(projectId);
+      message.success(res.message);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "收集豆包素材失败");
+    }
+  };
+
   return (
     <div>
       {/* Filter bar */}
@@ -243,13 +252,21 @@ export default function GenerationsTab({ projectId, isRunning, visible, onGachaS
           {sortOrder === "asc" ? "↑ 升序" : "↓ 降序"}
         </Button>
         {results.length > 0 && (
-          <Button
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={handleBatchProcess}
-          >
-            批量处理视频
-          </Button>
+          <>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={handleBatchProcess}
+            >
+              批量处理视频
+            </Button>
+            <Button
+              icon={<FolderAddOutlined />}
+              onClick={handleCollectDoubao}
+            >
+              收集豆包素材
+            </Button>
+          </>
         )}
       </Space>
 

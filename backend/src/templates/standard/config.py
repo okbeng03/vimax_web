@@ -9,6 +9,12 @@ working_dir = "/Users/wangchangbin/ai/vimax_ru"
 evaluate_agent_baseurl = "http://192.168.3.4:8000"
 evealute_project_id = "fdf55d15-388f-48e4-a75f-55608ca138a3"
 
+# model_name
+model_name = {
+    "primary": "qwen3.7-plus",
+    "secondary": "qwen3.7-flash-2026-07-15",
+    "tertiary": "qwen3.7-flash-2026-07-15",
+}
 register_voices = {
     "字博士": "字博士",
     "小豆丁": "小豆丁",
