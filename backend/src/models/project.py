@@ -22,6 +22,11 @@ class Project(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # ── 调度模式扩展字段（启动时幂等迁移补齐，见 models/migration.py）──
+    schedule_mode: Mapped[bool] = mapped_column(default=False, nullable=False)
+    schedule_status: Mapped[str] = mapped_column(String(20), nullable=False, default="idle")
+    schedule_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     user = relationship("User")
     template = relationship("Template")
     steps = relationship("Step", back_populates="project", order_by="Step.step_order", cascade="all, delete-orphan")

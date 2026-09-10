@@ -28,11 +28,15 @@ async def get_db() -> AsyncSession:
 
 
 async def init_db() -> None:
-    """Create all tables and seed default data."""
-    from src.models import User, Template, Project, Step, GenerationResult, OperationLog  # noqa: F401
+    """Create all tables, run idempotent column migrations, and seed default data."""
+    from src.models import (  # noqa: F401
+        User, Template, Project, Step, GenerationResult, OperationLog,
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        from src.models.migration import run_migrations
+        await run_migrations(conn)
 
     async with async_session_factory() as session:
         from sqlalchemy import select

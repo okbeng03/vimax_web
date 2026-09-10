@@ -50,6 +50,21 @@ export async function fetchProjectProgress(projectId: number): Promise<ProjectPr
   return data;
 }
 
+export async function fetchProjectScheduleStatus(
+  projectId: number,
+): Promise<{ project_id: number; schedule_mode: boolean; schedule_status: string; schedule_updated_at: string | null }> {
+  const { data } = await client.get(`/projects/${projectId}/schedule-status`);
+  return data;
+}
+
+export async function setProjectScheduleMode(
+  projectId: number,
+  schedule_mode: boolean,
+): Promise<{ project_id: number; schedule_mode: boolean; schedule_status: string; schedule_updated_at: string | null }> {
+  const { data } = await client.patch(`/projects/${projectId}/schedule-mode`, { schedule_mode });
+  return data;
+}
+
 export async function fetchProjectStdout(projectId: number): Promise<{ content: string }> {
   const { data } = await client.get(`/projects/${projectId}/stdout`);
   return data;

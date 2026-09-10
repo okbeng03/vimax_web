@@ -7,6 +7,8 @@ const ProjectList = lazy(() => import("./pages/ProjectList/ProjectListPage"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail/ProjectDetailPage"));
 const Statistics = lazy(() => import("./pages/Statistics/StatisticsPage"));
 const TemplateManagement = lazy(() => import("./pages/TemplateManagement/TemplateManagementPage"));
+const ScheduleManagement = lazy(() => import("./pages/ScheduleManagement/ScheduleManagementPage"));
+const ScheduleProjectDetail = lazy(() => import("./pages/ScheduleManagement/ScheduleProjectDetailPage"));
 
 function Loading() {
   return (
@@ -26,6 +28,8 @@ function App() {
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/templates" element={<TemplateManagement />} />
           <Route path="/statistics" element={<Statistics />} />
+          <Route path="/schedule" element={<ScheduleManagement />} />
+          <Route path="/schedule/projects/:id" element={<ScheduleProjectDetail />} />
         </Route>
       </Routes>
     </Suspense>

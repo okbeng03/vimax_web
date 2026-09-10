@@ -14,7 +14,7 @@ from src.database import init_db, async_session_factory, engine
 from src.models.operation_log import OperationLog
 from src.models.project import Project
 from src.models.step import Step
-from src.routers import templates, projects, steps, ws, files, generations, operations, stats, users
+from src.routers import templates, projects, steps, ws, files, generations, operations, stats, users, schedule
 from src.services.vimax_runner import vimax_runner
 
 # ── Ensure critical-path logs survive uvicorn reloads (file-based) ──
@@ -33,7 +33,7 @@ _sh = logging.StreamHandler()
 _sh.setLevel(logging.INFO)
 _sh.setFormatter(_log_fmt)
 
-_APP_LOGGERS = ("src.services.vimax_runner", "src.routers.steps", "src.routers.operations", "src.main")
+_APP_LOGGERS = ("src.services.vimax_runner", "src.routers.steps", "src.routers.operations", "src.services.schedule_client", "src.main")
 for _name in _APP_LOGGERS:
     _l = logging.getLogger(_name)
     _l.setLevel(logging.INFO)
@@ -49,8 +49,10 @@ async def lifespan(app: FastAPI):
     Shutdown: kill running ViMax process, record failure, dispose engine."""
     await init_db()
     await _startup_recovery()
-    yield
-    await _shutdown_handler()
+    try:
+        yield
+    finally:
+        await _shutdown_handler()
 
 
 async def _startup_recovery() -> None:
@@ -267,6 +269,7 @@ app.include_router(generations.router)
 app.include_router(operations.router)
 app.include_router(stats.router)
 app.include_router(users.router)
+app.include_router(schedule.router)
 
 
 @app.get("/api/health")

@@ -31,6 +31,7 @@ from src.schemas.project import (
     ProgressStepSchema,
     ProjectProgressResponse,
 )
+from src.schemas.schedule import ProjectScheduleResponse, ProjectScheduleUpdate
 from src.services.config_sync import ConfigSyncService
 from src.services.vimax_runner import vimax_runner
 from src.services.progress_manager import (
@@ -182,6 +183,8 @@ async def list_projects(
                 template_name=p.template.display_name if p.template else None,
                 current_step_name=p.current_step_name,
                 step_summary=StepSummary(total=len(steps), completed=completed, failed=failed),
+                schedule_mode=p.schedule_mode,
+                schedule_status=p.schedule_status,
                 created_at=p.created_at,
                 updated_at=p.updated_at,
             )
@@ -289,6 +292,8 @@ async def get_project(project_id: int, db: AsyncSession = Depends(get_db)):
         current_step_name=project.current_step_name,
         config=config,
         unconfirmed_count=unconfirmed_count,
+        schedule_mode=project.schedule_mode,
+        schedule_status=project.schedule_status,
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
@@ -378,6 +383,55 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)):
     # Remove working_dir from filesystem
     if os.path.exists(working_dir):
         shutil.rmtree(working_dir, ignore_errors=True)
+
+
+@router.patch("/{project_id}/schedule-mode", response_model=ProjectScheduleResponse)
+async def set_project_schedule_mode(
+    project_id: int,
+    body: ProjectScheduleUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Enable/disable schedule mode for a project.
+
+    Disable is rejected when unfinished scheduled tasks exist (local queue
+    in non-terminal state, or scheduler reports pending stats).
+    """
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if body.schedule_mode == project.schedule_mode:
+        await db.refresh(project)
+        return _to_schedule_response(project)
+
+    from src.services.project_schedule import set_schedule_mode
+    project = await set_schedule_mode(
+        db,
+        project,
+        body.schedule_mode,
+        record_operation=_record_operation,
+    )
+    return _to_schedule_response(project)
+
+
+@router.get("/{project_id}/schedule-status", response_model=ProjectScheduleResponse)
+async def get_project_schedule_status(project_id: int, db: AsyncSession = Depends(get_db)):
+    """Return current schedule mode / status for a project."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _to_schedule_response(project)
+
+
+def _to_schedule_response(project: Project) -> ProjectScheduleResponse:
+    return ProjectScheduleResponse(
+        project_id=project.id,
+        schedule_mode=project.schedule_mode,
+        schedule_status=project.schedule_status,
+        schedule_updated_at=project.schedule_updated_at,
+    )
 
 
 @router.get("/{project_id}/stdout")

@@ -31,6 +31,8 @@ class ProjectListItem(AppBaseSchema):
     template_name: str | None = None
     current_step_name: str | None = None
     step_summary: StepSummary | None = None
+    schedule_mode: bool = False
+    schedule_status: str = "idle"
     created_at: datetime
     updated_at: datetime
 
@@ -50,6 +52,8 @@ class ProjectResponse(AppBaseSchema):
     current_step_name: str | None = None
     config: ProjectConfig | None = None
     unconfirmed_count: int = 0
+    schedule_mode: bool = False
+    schedule_status: str = "idle"
     created_at: datetime
     updated_at: datetime
 

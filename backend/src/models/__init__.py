@@ -7,4 +7,6 @@ from src.models.step import Step
 from src.models.generation_result import GenerationResult
 from src.models.operation_log import OperationLog
 
-__all__ = ["User", "Template", "Project", "Step", "GenerationResult", "OperationLog"]
+__all__ = [
+    "User", "Template", "Project", "Step", "GenerationResult", "OperationLog",
+]

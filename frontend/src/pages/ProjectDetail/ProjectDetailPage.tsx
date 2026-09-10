@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Tabs, Typography, Tag, Spin, message, Space, Button, Modal } from "antd";
+import { Tabs, Typography, Tag, Spin, message, Space, Button, Modal, Switch, Tooltip } from "antd";
 import { PlayCircleOutlined, StopOutlined, ForwardOutlined } from "@ant-design/icons";
 import { useProjectStore } from "../../stores/projectStore";
 import { useExecutionStore } from "../../stores/executionStore";
-import { fetchRunningProject, fetchProjectProgress } from "../../api/projects";
+import { fetchRunningProject, fetchProjectProgress, setProjectScheduleMode } from "../../api/projects";
 import { useStdout } from "../../hooks/useStdout";
 import MonacoEditor from "@monaco-editor/react";
 import FullscreenWrapper from "../../components/common/FullscreenWrapper";
@@ -14,7 +14,7 @@ import GenerationsTab from "./GenerationsTab";
 import LogsTab from "./LogsTab";
 import ProgressBar from "../../components/progress/ProgressBar";
 import ProjectStatsPanel from "../../components/stats/ProjectStatsPanel";
-import type { ProgressStep } from "../../types/project";
+import type { ProgressStep, ProjectDetail } from "../../types/project";
 
 const { Title, Text } = Typography;
 
@@ -177,6 +177,31 @@ export default function ProjectDetailPage() {
       message.error("配置保存失败");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ---------- 调度模式开关 ----------
+  const [scheduleModeLoading, setScheduleModeLoading] = useState(false);
+
+  const handleScheduleModeChange = async (checked: boolean) => {
+    if (!pid) return;
+    setScheduleModeLoading(true);
+    try {
+      const updated = await setProjectScheduleMode(pid, checked);
+      useProjectStore.setState((state) => ({
+        currentProject: state.currentProject
+          ? {
+              ...state.currentProject,
+              schedule_mode: updated.schedule_mode,
+              schedule_status: updated.schedule_status as ProjectDetail["schedule_status"],
+            }
+          : null,
+      }));
+      message.success(checked ? "已开启调度模式" : "已关闭调度模式");
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "切换调度模式失败");
+    } finally {
+      setScheduleModeLoading(false);
     }
   };
 
@@ -437,7 +462,24 @@ export default function ProjectDetailPage() {
           </Title>
           <Space>
             <Tag color={statusInfo.color}>{statusInfo.label}</Tag>
+            {currentProject.schedule_mode && (
+              <Tag color="purple">调度模式</Tag>
+            )}
             <Text type="secondary">{currentProject.creative_description}</Text>
+            <Tooltip title="开启后生成任务将交由 Vimax 调度服务统一执行（关闭前需确认无未结束的调度任务）">
+              <Space size={4}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  调度模式
+                </Text>
+                <Switch
+                  size="small"
+                  checked={!!currentProject.schedule_mode}
+                  loading={scheduleModeLoading}
+                  disabled={scheduleModeLoading}
+                  onChange={(checked) => handleScheduleModeChange(checked)}
+                />
+              </Space>
+            </Tooltip>
           </Space>
         </div>
 

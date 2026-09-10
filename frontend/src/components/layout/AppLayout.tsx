@@ -5,6 +5,7 @@ import {
   BarChartOutlined,
   AppstoreOutlined,
   ThunderboltOutlined,
+  ScheduleOutlined,
 } from "@ant-design/icons";
 import { useState } from "react";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
@@ -33,6 +34,7 @@ export default function AppLayout() {
     { key: "/projects", icon: <ProjectOutlined />, label: "项目列表" },
     { key: "/templates", icon: <AppstoreOutlined />, label: "模板管理" },
     { key: "/statistics", icon: <BarChartOutlined />, label: "全局统计" },
+    { key: "/schedule", icon: <ScheduleOutlined />, label: "调度管理" },
   ];
 
   let selectedKey = "/projects";

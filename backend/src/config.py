@@ -17,6 +17,10 @@ class AppSettings(BaseSettings):
     # ComfyUI
     COMFYUI_BASE_URL: str = "http://192.168.3.4:8188"
 
+    # Vimax Scheduler (调度服务)
+    SCHEDULE_SERVICE_URL: str = "http://127.0.0.1:8001"
+    SCHEDULE_API_KEY: str = ""
+
     # User
     DEFAULT_USERNAME: str = "muze"
 

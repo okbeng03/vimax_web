@@ -46,9 +46,14 @@ export default function ProjectListPage() {
       dataIndex: "status",
       key: "status",
       width: 100,
-      render: (status: string) => {
+      render: (status: string, record: ProjectListItem) => {
         const s = STATUS_MAP[status] || { color: "default", label: status };
-        return <Tag color={s.color}>{s.label}</Tag>;
+        return (
+          <>
+            <Tag color={s.color}>{s.label}</Tag>
+            {record.schedule_mode && <Tag color="purple">调度</Tag>}
+          </>
+        );
       },
     },
     {

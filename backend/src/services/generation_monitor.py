@@ -15,6 +15,81 @@ from src.models.project import Project
 from src.models.step import Step
 from src.models.generation_result import GenerationResult
 from src.services.generation_parser import GenerationParser
+from src.services.schedule_log_parser import ScheduleLogParser
+from src.services.schedule_sync import submit_schedule_event
+
+
+async def _parse_and_persist_schedule(
+    output_path: Path,
+    project_id: int,
+    schedule_parser: ScheduleLogParser,
+    known_ids: set[str],
+    cached_step: list[int | None],
+) -> int:
+    """Parse schedule events ([COMFYUI SCHEDULE]) and submit directly to the scheduler.
+
+    Returns count of newly submitted schedule events. Each new event is submitted
+    to the scheduler service immediately — the scheduler records task & queue state
+    itself. Process-level dedup via known_ids; "invalid" events (unreadable workflow)
+    are dropped after logging to avoid infinite retries, while transient scheduler
+    errors are retried on the next poll.
+    """
+    events = schedule_parser.parse_file(str(output_path))
+    if not events:
+        return 0
+
+    new_events = [e for e in events if e.prompt_id not in known_ids]
+    if not new_events:
+        return 0
+
+    # ── 解析项目元信息（name / user_id / step_id），供调度器结果回传对齐 ──
+    project_name: str | None = None
+    user_id: int | None = None
+    step_id = cached_step[0]
+    async with async_session_factory() as session:
+        proj_r = await session.execute(select(Project).where(Project.id == project_id))
+        proj = proj_r.scalar_one_or_none()
+        if proj:
+            project_name = proj.name
+            user_id = proj.user_id
+            if step_id is None and proj.current_step_name:
+                step_r = await session.execute(
+                    select(Step).where(
+                        Step.project_id == project_id,
+                        Step.name == proj.current_step_name,
+                    )
+                )
+                step_obj = step_r.scalar_one_or_none()
+                if step_obj:
+                    step_id = step_obj.id
+                    cached_step[0] = step_id
+
+    submitted = 0
+    for evt in new_events:
+        try:
+            status = await submit_schedule_event(
+                project_id=project_id,
+                prompt_id=evt.prompt_id,
+                workflow_name=evt.workflow_name,
+                workflow_path=evt.workflow_path,
+                output_ids=evt.output_ids,
+                generation_type=evt.generation_type,
+                file_path=evt.file_path,
+                project_name=project_name,
+                user_id=user_id,
+                step_id=step_id,
+            )
+        except Exception:
+            # 提交失败不应阻断常规生成结果解析
+            print(f"[GenerationMonitor] submit_schedule_event failed for {evt.prompt_id}:", exc_info=True, flush=True)
+            continue
+        if status == "ok":
+            known_ids.add(evt.prompt_id)
+            submitted += 1
+        elif status == "invalid":
+            # workflow 缺失/损坏无法提交：标记已处理，避免无限重试
+            known_ids.add(evt.prompt_id)
+    return submitted
 
 
 async def _parse_and_persist(
@@ -108,10 +183,13 @@ async def monitor_generations_realtime(
     output_path = Path(working_dir) / "vimax_output.tmp"
     known_ids: set[str] = set()
     cached_step: list[int | None] = [None]
+    schedule_parser = ScheduleLogParser()
+    known_schedule_ids: set[str] = set()
 
     # ── Initial parse on start (catch results already in log) ──
     if output_path.exists():
         await _parse_and_persist(output_path, project_id, working_dir, known_ids, cached_step)
+        await _parse_and_persist_schedule(output_path, project_id, schedule_parser, known_schedule_ids, cached_step)
 
     # ── Poll loop ──
     while not stop_event.is_set():
@@ -123,7 +201,9 @@ async def monitor_generations_realtime(
 
         if output_path.exists():
             await _parse_and_persist(output_path, project_id, working_dir, known_ids, cached_step)
+            await _parse_and_persist_schedule(output_path, project_id, schedule_parser, known_schedule_ids, cached_step)
 
     # ── Final sweep after stop (belt-and-suspenders) ──
     if output_path.exists():
         await _parse_and_persist(output_path, project_id, working_dir, known_ids, cached_step)
+        await _parse_and_persist_schedule(output_path, project_id, schedule_parser, known_schedule_ids, cached_step)

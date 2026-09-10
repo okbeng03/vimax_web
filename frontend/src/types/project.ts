@@ -7,6 +7,8 @@ export interface ProjectListItem {
   template_name: string;
   current_step_name: string | null;
   step_summary: { total: number; completed: number; failed: number };
+  schedule_mode: boolean;
+  schedule_status: "idle" | "syncing" | "synced" | "failed";
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +26,8 @@ export interface ProjectDetail {
     config_py_content: string;
   };
   unconfirmed_count: number;
+  schedule_mode: boolean;
+  schedule_status: "idle" | "syncing" | "synced" | "failed";
   created_at: string;
   updated_at: string;
 }

@@ -189,6 +189,30 @@ class ConfigSyncService:
         new_content = yaml.dump(data, allow_unicode=True, default_flow_style=False)
         ConfigSyncService.write_yaml(working_dir, new_content)
 
+    @staticmethod
+    def set_mode(working_dir: str, mode: str) -> None:
+        """Set ``mode = "<mode>"`` in working_dir/config.py.
+
+        vimax_main 执行模式：run（本地执行）/ schedule（调度模式）。
+        无 config.py 或其中无 mode 字段时静默跳过（旧模板项目）。
+        """
+        config_path = Path(working_dir) / "config.py"
+        if not config_path.exists():
+            return
+        content = config_path.read_text(encoding="utf-8")
+        new_content, n = re.subn(
+            r'^mode\s*=\s*["\'][^"\']*["\']',
+            f'mode = "{mode}"',
+            content,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        if n == 0:
+            # 无 mode 字段时追加在文件末尾
+            new_content = content.rstrip() + f'\nmode = "{mode}"\n'
+        if new_content != content:
+            config_path.write_text(new_content, encoding="utf-8")
+
     # ------------------------------------------------------------------
     # Reverse sync: project working_dir → VIMAX_ROOT/configs/
     # ------------------------------------------------------------------
