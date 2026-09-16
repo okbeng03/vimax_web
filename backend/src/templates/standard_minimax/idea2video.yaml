@@ -8,28 +8,28 @@ chat_model:
 image_generator:
   class_path: tools.ImageGeneratorComfyUIFlux
   init_args:
-    base_url: http:/192.168.3.97:8188
+    base_url: http://192.168.3.97:8188
   max_requests_per_minute: null
   max_requests_per_day: null
 
 video_generator:
   class_path: tools.VideoGeneratorComfyUIMiniMax
   init_args:
-    base_url: http:/192.168.3.97:8188
+    base_url: http://192.168.3.97:8188
   max_requests_per_minute: null
   max_requests_per_day: null
 
 audio_generator:
   class_path: tools.AudioGeneratorComfyUIQwenTTS
   init_args:
-    base_url: http:/192.168.3.97:8188
+    base_url: http://192.168.3.97:8188
   max_requests_per_minute: null
   max_requests_per_day: null
 
 minor_video_generator:
   class_path: tools.VideoGeneratorComfyUILTX
   init_args:
-    base_url: http:/192.168.3.97:8188
+    base_url: http://192.168.3.97:8188
   max_requests_per_minute: null
   max_requests_per_day: null
 
@@ -47,4 +47,4 @@ gacha_config:
   scene: 1
   shot: 2
 
-comfyui_base_url: http:/192.168.3.97:8188
+comfyui_base_url: http://192.168.3.97:8188
