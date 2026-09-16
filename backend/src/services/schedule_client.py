@@ -65,6 +65,10 @@ class ScheduleClient:
     async def health(self) -> dict[str, Any]:
         return await self._request("GET", "/api/v1/health", timeout=5.0)
 
+    async def get_scheduler_status(self) -> dict[str, Any]:
+        """GET /api/v1/scheduler/status — 获取调度器状态（{"status": "paused", "enabled": true}）。"""
+        return await self._request("GET", "/api/v1/scheduler/status")
+
     async def pause_scheduler(self) -> dict[str, Any]:
         """POST /api/v1/scheduler/pause — 暂停调度器（不再派发新任务）。"""
         return await self._request("POST", "/api/v1/scheduler/pause")

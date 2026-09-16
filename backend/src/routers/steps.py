@@ -26,6 +26,7 @@ from src.schemas.step import (
 from src.services.config_sync import ConfigSyncService
 from src.services.vimax_runner import vimax_runner
 from src.services.generation_monitor import monitor_generations_realtime
+from src.services.schedule_client import schedule_client, ScheduleClientError
 from src.services.progress_manager import (
     get_template_progress,
     get_active_steps,
@@ -248,6 +249,73 @@ async def execute_steps(project_id: int, body: StepExecuteRequest, background_ta
             stop_event=gen_stop,
         )
 
+    async def _maybe_resume_scheduler(project_id: int) -> None:
+        """vimax-main 执行完后，检查调度服务并在合适条件下自动恢复调度。
+
+        1. 调度服务不可达（GET /api/v1/health）→ 跳过
+        2. 队列无剩余任务（GET /api/v1/queue 的 total == 0）→ 跳过
+        3. 调度器未处于暂停状态 → 跳过
+        4. 否则调用 resume_scheduler() 恢复调度
+        """
+        import logging
+        _log = logging.getLogger(__name__)
+
+        # 1) 调度服务是否可达
+        try:
+            health = await schedule_client.health()
+        except ScheduleClientError as exc:
+            _log.info(
+                "Scheduler service unavailable, skip resume check for project %s: %s",
+                project_id, exc,
+            )
+            return
+        _log.info(
+            "Scheduler health OK for project %s resume check: %s", project_id, health,
+        )
+
+        # 2) 队列是否还有任务（total 为剩余数量）
+        try:
+            queue = await schedule_client.list_queue()
+        except ScheduleClientError as exc:
+            _log.warning(
+                "Failed to query scheduler queue for project %s: %s", project_id, exc,
+            )
+            return
+        queue_total = int((queue or {}).get("total", 0))
+        if queue_total <= 0:
+            _log.info(
+                "Scheduler queue empty (total=%d), skip resume for project %s",
+                queue_total, project_id,
+            )
+            return
+
+        # 3) 调度器是否处于暂停状态（GET /api/v1/scheduler/status）
+        try:
+            sched_status = await schedule_client.get_scheduler_status()
+        except ScheduleClientError as exc:
+            _log.warning(
+                "Failed to query scheduler status for project %s: %s", project_id, exc,
+            )
+            return
+        if (sched_status or {}).get("status") != "paused":
+            _log.info(
+                "Scheduler is not paused (queue_total=%d), skip resume for project %s",
+                queue_total, project_id,
+            )
+            return
+
+        # 4) 恢复调度
+        try:
+            await schedule_client.resume_scheduler()
+            _log.info(
+                "Resumed scheduler after vimax-main completed for project %s (queue_total=%d)",
+                project_id, queue_total,
+            )
+        except ScheduleClientError as exc:
+            _log.warning(
+                "Failed to resume scheduler for project %s: %s", project_id, exc,
+            )
+
     async def _completion_monitor():
         import logging
         _log = logging.getLogger(__name__)
@@ -261,6 +329,11 @@ async def execute_steps(project_id: int, body: StepExecuteRequest, background_ta
         except Exception:
             _log.exception("_completion_monitor crashed for project %s", project.id)
         finally:
+            # vimax-main 执行完后（成功/失败都触发），检查并自动恢复调度
+            try:
+                await _maybe_resume_scheduler(project.id)
+            except Exception:
+                _log.exception("_maybe_resume_scheduler crashed for project %s", project.id)
             gen_stop.set()  # signal generation monitor to stop
 
     # ── Run both monitors concurrently (BackgroundTasks runs sequentially!) ──
